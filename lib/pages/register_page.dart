@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../data/auth_store.dart';
+import '../services/supabase_auth_service.dart';
 import '../theme/app_theme.dart';
 import 'login_page.dart';
 
@@ -12,10 +12,11 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage> {
   final _usernameCtrl = TextEditingController();
-  final _emailCtrl    = TextEditingController();
+  final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   String? _error;
   bool _showSuccess = false;
+  bool _loading = false;
   bool _obscure = true;
 
   @override
@@ -26,24 +27,55 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-  void _submit() {
-    final err = AuthStore.register(
+  Future<void> _submit() async {
+    setState(() {
+      _error = null;
+      _showSuccess = false;
+      _loading = true;
+    });
+
+    final err = await SupabaseAuthService.register(
       username: _usernameCtrl.text.trim(),
       email: _emailCtrl.text.trim(),
       password: _passwordCtrl.text,
     );
-    if (err != null) {
+
+    if (!mounted) return;
+
+    if (err == 'NEED_VERIFICATION') {
+      // Confirm Email ON → user harus verifikasi
       setState(() {
-        _error = err;
-        _showSuccess = false;
+        _error =
+            'Cek email Anda untuk verifikasi, lalu login kembali.';
+        _loading = false;
+      });
+      // Auto redirect ke login setelah 2 detik
+      Future.delayed(const Duration(seconds: 2), () {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+        );
       });
       return;
     }
+
+    if (err != null) {
+      setState(() {
+        _error = err;
+        _loading = false;
+      });
+      return;
+    }
+
+    // ✅ Register berhasil → tampil pesan sukses
     setState(() {
       _error = null;
       _showSuccess = true;
+      _loading = false;
     });
-    // Auto redirect ke login setelah 2 detik (seperti versi web)
+
+    // Auto redirect ke login setelah 2 detik
     Future.delayed(const Duration(seconds: 2), () {
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -59,7 +91,6 @@ class _RegisterPageState extends State<RegisterPage> {
       backgroundColor: const Color(0xFF1A1A1A),
       body: Stack(
         children: [
-          // Gradient background
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -69,11 +100,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
             ),
           ),
-          // Back button
-          Positioned(
-            top: 40, left: 16,
-            child: _backButton(context),
-          ),
+          Positioned(top: 40, left: 16, child: _backButton(context)),
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
@@ -103,7 +130,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Error
+                    // === Pesan Error ===
                     if (_error != null)
                       Container(
                         padding: const EdgeInsets.all(12),
@@ -112,16 +139,27 @@ class _RegisterPageState extends State<RegisterPage> {
                           color: const Color(0xFF3B0000),
                           borderRadius: BorderRadius.circular(6),
                           border: const Border(
-                            left: BorderSide(color: Color(0xFFE74C3C), width: 4),
+                            left: BorderSide(
+                                color: Color(0xFFE74C3C), width: 4),
                           ),
                         ),
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(color: Color(0xFFE74C3C)),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline,
+                                color: Color(0xFFE74C3C), size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _error!,
+                                style: const TextStyle(
+                                    color: Color(0xFFE74C3C)),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 
-                    // Success
+                    // === Pesan Sukses ===
                     if (_showSuccess)
                       Container(
                         padding: const EdgeInsets.all(12),
@@ -129,20 +167,30 @@ class _RegisterPageState extends State<RegisterPage> {
                         decoration: BoxDecoration(
                           color: const Color(0xFF0B3A1D),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFF2ECC71)),
+                          border: Border.all(
+                              color: const Color(0xFF2ECC71)),
                         ),
-                        child: const Text(
-                          'Pendaftaran berhasil! Anda akan diarahkan ke halaman login.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Color(0xFF2ECC71)),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.check_circle,
+                                color: Color(0xFF2ECC71), size: 18),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Pendaftaran berhasil! Mengalihkan ke login...',
+                                style: TextStyle(
+                                    color: Color(0xFF2ECC71)),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 
                     _field('Username', _usernameCtrl,
-                        hint: 'Nama pengguna'),
+                        hint: 'Nama pengguna (3-20 karakter)'),
                     const SizedBox(height: 16),
                     _field('Email', _emailCtrl,
-                        hint: 'Email',
+                        hint: 'nama@email.com',
                         keyboardType: TextInputType.emailAddress),
                     const SizedBox(height: 16),
                     _field(
@@ -152,7 +200,9 @@ class _RegisterPageState extends State<RegisterPage> {
                       obscure: _obscure,
                       suffix: IconButton(
                         icon: Icon(
-                          _obscure ? Icons.visibility_off : Icons.visibility,
+                          _obscure
+                              ? Icons.visibility_off
+                              : Icons.visibility,
                           color: AppColors.textGray,
                         ),
                         onPressed: () =>
@@ -162,9 +212,20 @@ class _RegisterPageState extends State<RegisterPage> {
                     const SizedBox(height: 24),
 
                     ElevatedButton.icon(
-                      onPressed: _submit,
-                      icon: const Icon(Icons.person_add),
-                      label: const Text('Gabung Sekarang'),
+                      onPressed: _loading ? null : _submit,
+                      icon: _loading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.person_add),
+                      label: Text(_loading
+                          ? 'Memproses...'
+                          : 'Gabung Sekarang'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accent,
                         foregroundColor: Colors.white,

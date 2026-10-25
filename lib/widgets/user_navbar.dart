@@ -25,6 +25,7 @@ class UserNavbar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         children: [
+          // === BARIS 1: Logo + Search ===
           Row(
             children: [
               const Text(
@@ -75,65 +76,89 @@ class UserNavbar extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _navItem(context, 'Jelajahi', Icons.explore, () {
-                  Navigator.push(
+
+          // === BARIS 2: Menu (FIXED, tidak bisa digeser) ===
+          Row(
+            children: [
+              Expanded(
+                child: _navItem(
+                  context,
+                  'Jelajahi',
+                  Icons.explore,
+                  () => Navigator.push(
                     context,
                     MaterialPageRoute(
                         builder: (_) => const JelajahiPage()),
-                  );
-                }),
-                _navItem(context, 'Daftar Tonton', Icons.bookmark, () {
-                  Navigator.push(
+                  ),
+                ),
+              ),
+              Expanded(
+                child: _navItem(
+                  context,
+                  'Daftar Tonton',
+                  Icons.bookmark,
+                  () => Navigator.push(
                     context,
                     MaterialPageRoute(
                         builder: (_) => const DaftarTontonPage()),
-                  );
-                }),
-                _navItem(context, 'Artikel', Icons.article, () {
-                  Navigator.push(
+                  ),
+                ),
+              ),
+              Expanded(
+                child: _navItem(
+                  context,
+                  'Artikel',
+                  Icons.article,
+                  () => Navigator.push(
                     context,
                     MaterialPageRoute(
                         builder: (_) => const ArtikelPage()),
-                  );
-                }),
-                _navItem(context, 'Akun', Icons.person, () {
-                  _showAccountMenu(context);
-                }),
-              ],
-            ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: _navItem(
+                  context,
+                  'Akun',
+                  Icons.person,
+                  () => _showAccountMenu(context),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _navItem(BuildContext context, String label, IconData icon,
-      VoidCallback onTap) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 20),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Row(
-            children: [
-              Icon(icon, color: AppColors.textLight, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: AppColors.textLight,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 13,
-                ),
+  Widget _navItem(
+    BuildContext context,
+    String label,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: AppColors.textLight, size: 20),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.textLight,
+                fontWeight: FontWeight.w500,
+                fontSize: 11,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -159,12 +184,15 @@ class UserNavbar extends StatelessWidget {
                   child: Icon(Icons.person, color: Colors.white),
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  username,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Text(
+                    username,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),

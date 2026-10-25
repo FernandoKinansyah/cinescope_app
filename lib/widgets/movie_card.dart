@@ -29,26 +29,26 @@ class MovieCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Poster (aspect ratio 2:3)
-            AspectRatio(
-              aspectRatio: 2 / 3,
+            // === POSTER (aspect 2:3) ===
+            Expanded(
+              flex: 3,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  movie.poster != null
-                      ? Image.network(movie.poster!, fit: BoxFit.cover)
-                      : Container(
-                          color: const Color(0xFF666666),
-                          child: const Center(
-                            child: Text('🎬', style: TextStyle(fontSize: 40)),
-                          ),
-                        ),
+                  movie.poster != null && movie.poster!.isNotEmpty
+                      ? Image.network(
+                          movie.poster!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _placeholder(),
+                        )
+                      : _placeholder(),
                   if (badgeText != null)
                     Positioned(
-                      top: 10, right: 10,
+                      top: 8,
+                      right: 8,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                            horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
                           color: badgeColor.withOpacity(0.95),
                           borderRadius: BorderRadius.circular(4),
@@ -57,7 +57,7 @@ class MovieCard extends StatelessWidget {
                           badgeText!,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 11,
+                            fontSize: 10,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -66,77 +66,90 @@ class MovieCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Info
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    movie.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    movie.genre,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.textGray,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (movie.status == 'released') ...[
-                    Row(
+
+            // === INFO ===
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.comment,
-                            size: 13, color: AppColors.commentBlue),
-                        const SizedBox(width: 4),
-                        Text('${movie.reviewCount} komentar',
-                            style: const TextStyle(
-                                color: AppColors.commentBlue, fontSize: 11)),
-                        const SizedBox(width: 10),
-                        const Icon(Icons.favorite,
-                            size: 13, color: AppColors.likeRed),
-                        const SizedBox(width: 4),
-                        Text('${movie.likeCount} like',
-                            style: const TextStyle(
-                                color: AppColors.likeRed, fontSize: 11)),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const Icon(Icons.star,
-                            size: 14, color: AppColors.star),
-                        const SizedBox(width: 4),
                         Text(
-                          '${movie.avgRating.toStringAsFixed(1)}/5.0',
+                          movie.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: AppColors.star,
+                            color: Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
+                            height: 1.2,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          movie.genre,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.textGray,
+                            fontSize: 10,
                           ),
                         ),
                       ],
                     ),
-                  ] else ...[
-                    Text(
-                      movie.releaseDate != null
-                          ? '📅 Rilis ${_formatTanggal(movie.releaseDate!)}'
-                          : '⏳ Segera Hadir',
-                      style: const TextStyle(
-                          color: AppColors.textGray, fontSize: 12),
-                    ),
+                    if (movie.status == 'released') ...[
+                      Row(
+                        children: [
+                          const Icon(Icons.comment,
+                              size: 10, color: AppColors.commentBlue),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${movie.reviewCount}',
+                            style: const TextStyle(
+                                color: AppColors.commentBlue,
+                                fontSize: 9),
+                          ),
+                          const SizedBox(width: 6),
+                          const Icon(Icons.favorite,
+                              size: 10, color: AppColors.likeRed),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${movie.likeCount}',
+                            style: const TextStyle(
+                                color: AppColors.likeRed, fontSize: 9),
+                          ),
+                          const Spacer(),
+                          const Icon(Icons.star,
+                              size: 11, color: AppColors.star),
+                          const SizedBox(width: 2),
+                          Text(
+                            movie.avgRating.toStringAsFixed(1),
+                            style: const TextStyle(
+                              color: AppColors.star,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      Text(
+                        movie.releaseDate != null
+                            ? '📅 ${_formatTanggal(movie.releaseDate!)}'
+                            : '⏳ Segera',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: AppColors.textGray, fontSize: 10),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ],
@@ -145,9 +158,21 @@ class MovieCard extends StatelessWidget {
     );
   }
 
+  Widget _placeholder() {
+    return Container(
+      color: const Color(0xFF666666),
+      child: const Center(
+        child: Text('🎬', style: TextStyle(fontSize: 32)),
+      ),
+    );
+  }
+
   String _formatTanggal(DateTime d) {
-    const bulan = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-                   'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const bulan = [
+      '',
+      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+    ];
     return '${d.day} ${bulan[d.month]} ${d.year}';
   }
 }

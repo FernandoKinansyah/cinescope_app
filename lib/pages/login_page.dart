@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import '../data/auth_store.dart';
+import '../services/supabase_auth_service.dart';
 import '../theme/app_theme.dart';
-import 'home_page.dart';
 import 'user_home_page.dart';
 import 'register_page.dart';
 
@@ -13,10 +12,12 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _emailCtrl    = TextEditingController();
+  final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   String? _error;
+  bool _loading = false;
   bool _obscure = true;
+  bool _showResend = false;
 
   @override
   void dispose() {
@@ -25,18 +26,40 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _submit() {
-    final err = AuthStore.login(
+  Future<void> _submit() async {
+    setState(() {
+      _error = null;
+      _loading = true;
+      _showResend = false;
+    });
+
+    final err = await SupabaseAuthService.login(
       email: _emailCtrl.text.trim(),
       password: _passwordCtrl.text,
     );
-    if (err != null) {
-      setState(() => _error = err);
+
+    if (!mounted) return;
+
+    if (err == 'EMAIL_NOT_VERIFIED') {
+      setState(() {
+        _error =
+            'Email belum diverifikasi!\n\nCek inbox email Anda dan klik link verifikasi. Kalau tidak ada, cek folder Spam.';
+        _showResend = true;
+        _loading = false;
+      });
       return;
     }
-    setState(() => _error = null);
 
-    // Pindah ke UserHomePage
+    if (err != null) {
+      setState(() {
+        _error = err;
+        _loading = false;
+      });
+      return;
+    }
+
+    setState(() => _loading = false);
+
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
@@ -44,6 +67,32 @@ class _LoginPageState extends State<LoginPage> {
       ),
       (route) => false,
     );
+  }
+
+  Future<void> _resendVerification() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Isi email dulu sebelum kirim ulang')),
+      );
+      return;
+    }
+
+    final err = await SupabaseAuthService.resendVerification(email);
+    if (!mounted) return;
+
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(err)),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Email verifikasi sudah dikirim ulang'),
+        ),
+      );
+    }
   }
 
   @override
@@ -93,7 +142,7 @@ class _LoginPageState extends State<LoginPage> {
 
                     if (_error != null)
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(14),
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(
                           color: const Color(0xFF3B0000),
@@ -103,16 +152,51 @@ class _LoginPageState extends State<LoginPage> {
                                 color: Color(0xFFE74C3C), width: 4),
                           ),
                         ),
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(color: Color(0xFFE74C3C)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.error_outline,
+                                    color: Color(0xFFE74C3C), size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _error!,
+                                    style: const TextStyle(
+                                        color: Color(0xFFE74C3C),
+                                        height: 1.4),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_showResend) ...[
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: _resendVerification,
+                                  icon: const Icon(Icons.refresh,
+                                      size: 16),
+                                  label: const Text(
+                                      'Kirim Ulang Email Verifikasi'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor:
+                                        const Color(0xFFE74C3C),
+                                    side: const BorderSide(
+                                        color: Color(0xFFE74C3C)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
 
                     _field(
                       'Email',
                       _emailCtrl,
-                      hint: 'Masukkan Email',
+                      hint: 'nama@email.com',
                       keyboardType: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 16),
@@ -120,7 +204,7 @@ class _LoginPageState extends State<LoginPage> {
                     _field(
                       'Password',
                       _passwordCtrl,
-                      hint: 'Masukkan Password',
+                      hint: 'Minimal 6 karakter',
                       obscure: _obscure,
                       suffix: IconButton(
                         icon: Icon(
@@ -136,9 +220,18 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(height: 24),
 
                     ElevatedButton.icon(
-                      onPressed: _submit,
-                      icon: const Icon(Icons.login),
-                      label: const Text('Masuk'),
+                      onPressed: _loading ? null : _submit,
+                      icon: _loading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.login),
+                      label: Text(_loading ? 'Memuat...' : 'Masuk'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accent,
                         foregroundColor: Colors.white,
@@ -232,10 +325,7 @@ class _LoginPageState extends State<LoginPage> {
         if (Navigator.canPop(context)) {
           Navigator.pop(context);
         } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const HomePage()),
-          );
+          Navigator.pushReplacementNamed(context, '/');
         }
       },
       icon: const Icon(Icons.arrow_back, size: 16),

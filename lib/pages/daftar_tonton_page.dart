@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../data/dummy_data.dart';
-import '../data/watchlist_store.dart';
+import '../models/movie.dart';
+import '../services/watchlist_service.dart';
 import '../theme/app_theme.dart';
 import 'detail_page.dart';
 
@@ -12,27 +12,78 @@ class DaftarTontonPage extends StatefulWidget {
 }
 
 class _DaftarTontonPageState extends State<DaftarTontonPage> {
+  List<Movie> _movies = [];
+  bool _isLoading = true;
+  String? _error;
+
   @override
   void initState() {
     super.initState();
-    WatchlistStore.setMovies(DummyData.movies);
-    WatchlistStore.notifier.addListener(_onChange);
+    _loadData();
   }
 
-  @override
-  void dispose() {
-    WatchlistStore.notifier.removeListener(_onChange);
-    super.dispose();
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final movies = await WatchlistService.getMyMovies();
+      setState(() {
+        _movies = movies;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Gagal memuat: $e';
+        _isLoading = false;
+      });
+    }
   }
 
-  void _onChange() {
-    if (mounted) setState(() {});
+  Future<void> _remove(Movie m) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text('Hapus dari Daftar Tonton?',
+            style: TextStyle(color: Colors.white)),
+        content: Text('"${m.title}" akan dihapus dari daftar tonton Anda.',
+            style: const TextStyle(color: AppColors.textLight)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal',
+                style: TextStyle(color: AppColors.textGray)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Hapus',
+                style: TextStyle(color: AppColors.accent)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await WatchlistService.remove(m.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Film dihapus dari daftar tonton')),
+      );
+      _loadData();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menghapus: $e')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final list = WatchlistStore.movies;
-
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -41,13 +92,45 @@ class _DaftarTontonPageState extends State<DaftarTontonPage> {
         title: const Text('Daftar Tonton Saya',
             style: TextStyle(color: Colors.white)),
       ),
-      body: list.isEmpty
-          ? _emptyState()
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: list.length,
-              itemBuilder: (context, i) => _card(list[i]),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.accent),
+            )
+          : _error != null
+              ? _errorView()
+              : _movies.isEmpty
+                  ? _emptyState()
+                  : RefreshIndicator(
+                      onRefresh: _loadData,
+                      color: AppColors.accent,
+                      child: _listView(),
+                    ),
+    );
+  }
+
+  Widget _errorView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline,
+                color: AppColors.accent, size: 64),
+            const SizedBox(height: 20),
+            Text(_error ?? 'Error',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 16)),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _loadData,
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent),
+              child: const Text('Coba Lagi'),
             ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -58,19 +141,21 @@ class _DaftarTontonPageState extends State<DaftarTontonPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.movie_filter,
-                size: 80, color: AppColors.accent),
-            const SizedBox(height: 20),
-            const Text('Daftar Tonton Kosong',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold)),
+            const Icon(Icons.bookmark_border,
+                size: 96, color: AppColors.accent),
+            const SizedBox(height: 24),
+            const Text(
+              'Daftar Tonton Kosong',
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 12),
             const Text(
-              'Anda belum menambahkan film apapun ke daftar tonton.',
+              'Anda belum menambahkan film apapun.\nBuka detail film dan klik "Daftar Tonton".',
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textGray),
+              style: TextStyle(color: AppColors.textGray, fontSize: 14),
             ),
           ],
         ),
@@ -78,39 +163,46 @@ class _DaftarTontonPageState extends State<DaftarTontonPage> {
     );
   }
 
-  Widget _card(movie) {
+  Widget _listView() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _movies.length,
+      itemBuilder: (context, i) => _card(_movies[i]),
+    );
+  }
+
+  Widget _card(Movie movie) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
       ),
       clipBehavior: Clip.antiAlias,
       child: Row(
         children: [
           // Poster
           SizedBox(
-            width: 100,
-            height: 150,
+            width: 110,
+            height: 165,
             child: Stack(
               fit: StackFit.expand,
               children: [
-                movie.poster != null
-                    ? Image.network(movie.poster!, fit: BoxFit.cover)
-                    : Container(
-                        color: const Color(0xFF333333),
-                        child: const Center(
-                          child: Text('🎬',
-                              style: TextStyle(fontSize: 36)),
-                        ),
-                      ),
+                movie.poster != null && movie.poster!.isNotEmpty
+                    ? Image.network(
+                        movie.poster!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _placeholder(),
+                      )
+                    : _placeholder(),
                 const Positioned(
-                  top: 6, right: 6,
+                  top: 8,
+                  right: 8,
                   child: CircleAvatar(
-                    radius: 14,
+                    radius: 16,
                     backgroundColor: AppColors.accent,
-                    child: Icon(Icons.favorite,
-                        color: Colors.white, size: 14),
+                    child: Icon(Icons.bookmark,
+                        color: Colors.white, size: 16),
                   ),
                 ),
               ],
@@ -123,11 +215,15 @@ class _DaftarTontonPageState extends State<DaftarTontonPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(movie.title,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold)),
+                  Text(
+                    movie.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
@@ -138,9 +234,30 @@ class _DaftarTontonPageState extends State<DaftarTontonPage> {
                         child: Text(
                           movie.genre,
                           style: const TextStyle(
-                              color: AppColors.textGray, fontSize: 12),
+                              color: AppColors.textGray, fontSize: 13),
                           overflow: TextOverflow.ellipsis,
                         ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${movie.releaseYear ?? '-'} • ${movie.duration ?? '-'}',
+                    style: const TextStyle(
+                        color: AppColors.textGray, fontSize: 12),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Icon(Icons.star,
+                          color: AppColors.star, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${movie.avgRating.toStringAsFixed(1)}/5',
+                        style: const TextStyle(
+                            color: AppColors.star,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
@@ -154,34 +271,31 @@ class _DaftarTontonPageState extends State<DaftarTontonPage> {
                             MaterialPageRoute(
                                 builder: (_) =>
                                     DetailPage(movieId: movie.id)),
-                          ),
-                          icon: const Icon(Icons.info_outline,
-                              size: 14),
+                          ).then((_) => _loadData()),
+                          icon: const Icon(Icons.info_outline, size: 16),
                           label: const Text('Detail',
-                              style: TextStyle(fontSize: 12)),
+                              style: TextStyle(fontSize: 13)),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: Colors.white,
                             side: const BorderSide(
                                 color: Color(0xFF555555)),
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 8),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 10),
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            WatchlistStore.remove(movie.id);
-                          },
-                          icon: const Icon(Icons.delete, size: 14),
+                          onPressed: () => _remove(movie),
+                          icon: const Icon(Icons.delete, size: 16),
                           label: const Text('Hapus',
-                              style: TextStyle(fontSize: 12)),
+                              style: TextStyle(fontSize: 13)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.accent,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 8),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 10),
                           ),
                         ),
                       ),
@@ -192,6 +306,15 @@ class _DaftarTontonPageState extends State<DaftarTontonPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _placeholder() {
+    return Container(
+      color: const Color(0xFF333333),
+      child: const Center(
+        child: Text('🎬', style: TextStyle(fontSize: 36)),
       ),
     );
   }
